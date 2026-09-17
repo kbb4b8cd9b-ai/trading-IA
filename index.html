@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>Trading AI — 10 Agents</title>
+<style>
+:root{--bg:#07101d;--card:#0e1a2b;--card2:#111f33;--text:#eef5ff;--muted:#91a4bb;--line:#20324a;--good:#3ddc97;--bad:#ff6b6b;--accent:#6ea8fe}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(160deg,#07101d,#0b1524 55%,#08111d);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:720px;margin:auto;padding:18px 14px 34px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+h1{font-size:22px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:3px}
+.badge{padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:#bcd0e8;font-size:11px;background:#0b1727}
+.card{background:rgba(14,26,43,.92);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+.balance{font-size:36px;font-weight:800;letter-spacing:-1px}.pnl{font-size:13px;margin-top:4px}.good{color:var(--good)}.bad{color:var(--bad)}.muted{color:var(--muted)}
+canvas{width:100%;height:170px;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--card2);border-radius:14px;padding:12px}.stat b{display:block;font-size:18px;margin-top:3px}
+button{width:100%;border:0;border-radius:13px;padding:13px 12px;background:var(--accent);color:#06101d;font-weight:800;font-size:14px}
+button.secondary{background:#18283d;color:#dbe9fa;border:1px solid var(--line)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.row+.row{margin-top:10px}
+.agent{padding:12px 0;border-bottom:1px solid var(--line)}.agent:last-child{border-bottom:0}
+.agent .name{font-weight:700}.signal{font-size:11px;padding:4px 7px;border-radius:999px;background:#192a40;color:#bcd0e8}
+.small{font-size:12px}.trade{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.note{font-size:11px;color:var(--muted);line-height:1.45}
+footer{text-align:center;color:#64788f;font-size:11px;padding:10px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div><h1>Trading AI</h1><div class="sub">10 agenti · simulazione paper trading</div></div>
+  <div class="badge">€50 virtuali</div>
+</header>
+
+<section class="card">
+  <div class="muted small">Capitale virtuale</div>
+  <div id="balance" class="balance">€50,00</div>
+  <div id="pnl" class="pnl good">+€0,00 (0,00%)</div>
+  <div style="margin-top:12px"><canvas id="chart" width="680" height="170"></canvas></div>
+</section>
+
+<section class="grid">
+  <div class="stat"><span class="muted small">Operazioni</span><b id="trades">0</b></div>
+  <div class="stat"><span class="muted small">Agenti attivi</span><b>10/10</b></div>
+</section>
+
+<section class="card">
+  <div class="row"><strong>Controllo simulazione</strong><span class="muted small">solo virtuale</span></div>
+  <div style="height:10px"></div>
+  <button onclick="runCycle()">Esegui ciclo dei 10 agenti</button>
+  <div style="height:8px"></div>
+  <button class="secondary" onclick="resetApp()">Ripristina €50</button>
+  <div class="note" style="margin-top:10px">Questa demo non invia ordini a broker e non usa denaro reale.</div>
+</section>
+
+<section class="card">
+  <div class="row"><strong>10 agenti</strong><span id="last" class="muted small">Pronti</span></div>
+  <div id="agents"></div>
+</section>
+
+<section class="card">
+  <div class="row"><strong>Ultime operazioni</strong><span class="muted small">paper</span></div>
+  <div id="history" style="margin-top:6px"></div>
+</section>
+
+<footer>Trading AI Demo · capitale virtuale · nessuna garanzia di rendimento</footer>
+</main>
+
+<script>
+const names=[
+"Trend Hunter","Momentum AI","Mean Reversion","Volatility Scout","Breakout AI",
+"Risk Guardian","Macro Pulse","Pattern Vision","Portfolio Optimizer","Consensus Agent"
+];
+const key="trading_ai_demo_v1";
+let state=JSON.parse(localStorage.getItem(key)||"null")||{
+ balance:50, trades:0, history:[], curve:[50], agents:names.map((n,i)=>({name:n,signal:["BUY","BUY","HOLD","SELL"][i%4],score:60+i*3}))
+};
+function euro(x){return new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR"}).format(x)}
+function save(){localStorage.setItem(key,JSON.stringify(state));render()}
+function render(){
+ document.getElementById("balance").textContent=euro(state.balance);
+ const pnl=state.balance-50, pct=pnl/50*100;
+ const p=document.getElementById("pnl"); p.textContent=(pnl>=0?"+":"")+euro(pnl)+" ("+(pct>=0?"+":"")+pct.toFixed(2)+"%)"; p.className="pnl "+(pnl>=0?"good":"bad");
+ document.getElementById("trades").textContent=state.trades;
+ document.getElementById("last").textContent=state.history[0]?.time||"Pronti";
+ document.getElementById("agents").innerHTML=state.agents.map((a,i)=>`
+  <div class="agent"><div class="row"><span class="name">${i+1}. ${a.name}</span><span class="signal">${a.signal}</span></div>
+  <div class="muted small" style="margin-top:4px">Confidenza ${a.score}%</div></div>`).join("");
+ document.getElementById("history").innerHTML=state.history.length?state.history.slice(0,8).map(t=>`
+  <div class="trade"><span><b>${t.action}</b> · ${t.agent}<br><span class="muted small">${t.time}</span></span><span class="${t.delta>=0?"good":"bad"}">${t.delta>=0?"+":""}${euro(t.delta)}</span></div>`).join(""):"<div class='muted small' style='padding:12px 0'>Nessuna operazione ancora.</div>";
+ draw();
+}
+function runCycle(){
+ let avg=(Math.random()-.42)*0.018;
+ let delta=state.balance*avg;
+ state.balance=Math.max(0,state.balance+delta);
+ state.trades++;
+ state.agents.forEach((a,i)=>{
+   const r=Math.random(); a.signal=r>.64?"BUY":r<.30?"SELL":"HOLD"; a.score=Math.round(55+Math.random()*42);
+ });
+ const active=state.agents.find(a=>a.signal!=="HOLD")||state.agents[0];
+ state.history.unshift({agent:active.name,action:active.signal,time:new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"}),delta});
+ state.curve.push(state.balance); if(state.curve.length>40)state.curve.shift();
+ save();
+}
+function resetApp(){if(confirm("Ripristinare il capitale virtuale a €50?")){state={balance:50,trades:0,history:[],curve:[50],agents:names.map((n,i)=>({name:n,signal:"HOLD",score:60+i*2}))};save()}}
+function draw(){
+ const c=document.getElementById("chart"),x=c.getContext("2d"),w=c.width,h=c.height;
+ x.clearRect(0,0,w,h); const vals=state.curve, min=Math.min(...vals),max=Math.max(...vals),span=max-min||1;
+ x.beginPath();
+ vals.forEach((v,i)=>{const px=i*(w-18)/(Math.max(1,vals.length-1))+9,py=h-12-(v-min)/span*(h-28);i?x.lineTo(px,py):x.moveTo(px,py)});
+ x.lineWidth=3;x.strokeStyle="#6ea8fe";x.stroke();
+ x.font="12px -apple-system, sans-serif";x.fillStyle="#91a4bb";x.fillText(euro(min),9,h-2);x.fillText(euro(max),9,13);
+}
+render();
+</script>
+</body>
+</html>
